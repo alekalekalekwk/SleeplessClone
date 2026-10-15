@@ -10,6 +10,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var isSleepDisabled: Bool = false
     var sleepTimer: Timer?
     var batteryTimer: Timer?
+    var automaticTurnOffRetryScheduled: Bool = false
+    var automaticTurnOffAlertShown: Bool = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -118,7 +120,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                    max > 0 {
                     let percent = Double(current) / Double(max) * 100.0
                     if percent <= 20.0 {
-                        turnOff()
+                        automaticTurnOff()
                         break
                     }
                 }
@@ -127,16 +129,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // User‑initiated AppleScript fallback (allows password prompt)
-    private func setSleepDisabledUser(_ on: Bool) -> Bool {
+    func setSleepDisabledUser(_ on: Bool) -> Bool {
         let scriptSource = "do shell script \"/usr/bin/pmset -a disablesleep \(on ? 1 : 0)\" with administrator privileges"
         var error: NSDictionary?
         if let script = NSAppleScript(source: scriptSource) {
             script.executeAndReturnError(&error)
             if error == nil {
-                isSleepDisabled = on
-                updateUI()
                 return true
             }
+        }
+        return false
+    }
+
+    @discardableResult
+    func setSleepDisabledManual(_ on: Bool) -> Bool {
+        if trySudoSetSleep(on) {
+            isSleepDisabled = on
+            updateUI()
+            return true
+        }
+        if setSleepDisabledUser(on) {
+            isSleepDisabled = on
+            updateUI()
+            return true
         }
         return false
     }
@@ -155,7 +170,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // Helper for sudo invocation (synchronous, no UI block)
-    private func trySudoSetSleep(_ on: Bool) -> Bool {
+    func trySudoSetSleep(_ on: Bool) -> Bool {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
         proc.arguments = ["-n", "/usr/bin/pmset", "-a", "disablesleep", on ? "1" : "0"]
@@ -168,15 +183,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-
-    func activate(duration: TimeInterval?) {
+    func activateManual(duration: TimeInterval?) {
         sleepTimer?.invalidate()
         sleepTimer = nil
-        if setSleepDisabled(true) {
+        if setSleepDisabledManual(true) {
             if let duration = duration {
                 let timer = Timer(timeInterval: duration, repeats: false) { [weak self] _ in
                     Task { @MainActor in
-                        self?.turnOff()
+                        self?.automaticTurnOff()
                     }
                 }
                 RunLoop.main.add(timer, forMode: .common)
@@ -185,29 +199,71 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func turnOff() {
+    func automaticTurnOff() {
         sleepTimer?.invalidate()
         sleepTimer = nil
-        setSleepDisabled(false)
+        let success = setSleepDisabled(false)
+        if success {
+            automaticTurnOffRetryScheduled = false
+        } else {
+            isSleepDisabled = true
+            updateUI()
+            if !automaticTurnOffRetryScheduled {
+                automaticTurnOffRetryScheduled = true
+                let retryTimer = Timer(timeInterval: 300.0, repeats: false) { [weak self] _ in
+                    Task { @MainActor in
+                        guard let self = self else { return }
+                        let retrySuccess = self.setSleepDisabled(false)
+                        if !retrySuccess {
+                            self.isSleepDisabled = true
+                            self.updateUI()
+                            if !self.automaticTurnOffAlertShown {
+                                self.automaticTurnOffAlertShown = true
+                                let alert = NSAlert()
+                                alert.messageText = "Gagal Mematikan Mode Sleepless"
+                                alert.informativeText = "Otomatisasi gagal mematikan pencegahan tidur. Silakan jalankan di Terminal:\nsudo pmset -a disablesleep 0"
+                                alert.alertStyle = .warning
+                                alert.addButton(withTitle: "OK")
+                                alert.runModal()
+                            }
+                        }
+                    }
+                }
+                RunLoop.main.add(retryTimer, forMode: .common)
+            }
+        }
     }
 
     @objc func turnOffAction() {
-        turnOff()
+        sleepTimer?.invalidate()
+        sleepTimer = nil
+        setSleepDisabledManual(false)
     }
 
     @objc func enableForeverAction() {
-        activate(duration: nil)
+        activateManual(duration: nil)
     }
 
     @objc func enableOneHourAction() {
-        activate(duration: 3600)
+        activateManual(duration: 3600)
     }
 
     @objc func enableThreeHoursAction() {
-        activate(duration: 10800)
+        activateManual(duration: 10800)
     }
 
     @objc func quit() {
+        if isSleepDisabled {
+            let success = setSleepDisabledManual(false)
+            if !success {
+                let alert = NSAlert()
+                alert.messageText = "Gagal Mematikan Mode Sleepless"
+                alert.informativeText = "Gagal mematikan pencegahan tidur sebelum keluar. Silakan jalankan di Terminal:\nsudo pmset -a disablesleep 0"
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "OK")
+                alert.runModal()
+            }
+        }
         NSApp.terminate(nil)
     }
 }
