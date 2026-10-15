@@ -4,8 +4,9 @@ import AppKit
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     var statusMenuItem: NSMenuItem!
-    var toggleMenuItem: NSMenuItem!
+    var matikanMenuItem: NSMenuItem!
     var isSleepDisabled: Bool = false
+    var sleepTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -20,9 +21,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusMenuItem.isEnabled = false
         menu.addItem(statusMenuItem)
 
-        toggleMenuItem = NSMenuItem(title: "Aktifkan", action: #selector(toggleAction), keyEquivalent: "t")
-        toggleMenuItem.target = self
-        menu.addItem(toggleMenuItem)
+        matikanMenuItem = NSMenuItem(title: "Matikan", action: #selector(turnOffAction), keyEquivalent: "m")
+        matikanMenuItem.target = self
+        menu.addItem(matikanMenuItem)
+
+        let foreverItem = NSMenuItem(title: "Aktifkan selamanya", action: #selector(enableForeverAction), keyEquivalent: "")
+        foreverItem.target = self
+        menu.addItem(foreverItem)
+
+        let oneHourItem = NSMenuItem(title: "Aktifkan 1 jam", action: #selector(enableOneHourAction), keyEquivalent: "")
+        oneHourItem.target = self
+        menu.addItem(oneHourItem)
+
+        let threeHoursItem = NSMenuItem(title: "Aktifkan 3 jam", action: #selector(enableThreeHoursAction), keyEquivalent: "")
+        threeHoursItem.target = self
+        menu.addItem(threeHoursItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -38,7 +51,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.image = NSImage(systemSymbolName: isSleepDisabled ? "moon.zzz.fill" : "moon.zzz", accessibilityDescription: nil)
         }
         statusMenuItem.title = isSleepDisabled ? "Status: On" : "Status: Off"
-        toggleMenuItem.title = isSleepDisabled ? "Matikan" : "Aktifkan"
+        matikanMenuItem.isHidden = !isSleepDisabled
     }
 
     @discardableResult
@@ -56,8 +69,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
-    @objc func toggleAction() {
-        setSleepDisabled(!isSleepDisabled)
+    func activate(duration: TimeInterval?) {
+        sleepTimer?.invalidate()
+        sleepTimer = nil
+        if setSleepDisabled(true) {
+            if let duration = duration {
+                let timer = Timer(timeInterval: duration, repeats: false) { [weak self] _ in
+                    Task { @MainActor in
+                        self?.turnOff()
+                    }
+                }
+                RunLoop.main.add(timer, forMode: .common)
+                sleepTimer = timer
+            }
+        }
+    }
+
+    func turnOff() {
+        sleepTimer?.invalidate()
+        sleepTimer = nil
+        setSleepDisabled(false)
+    }
+
+    @objc func turnOffAction() {
+        turnOff()
+    }
+
+    @objc func enableForeverAction() {
+        activate(duration: nil)
+    }
+
+    @objc func enableOneHourAction() {
+        activate(duration: 3600)
+    }
+
+    @objc func enableThreeHoursAction() {
+        activate(duration: 10800)
     }
 
     @objc func quit() {
