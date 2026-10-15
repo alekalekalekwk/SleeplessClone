@@ -126,8 +126,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    @discardableResult
-    func setSleepDisabled(_ on: Bool) -> Bool {
+    // User‑initiated AppleScript fallback (allows password prompt)
+    private func setSleepDisabledUser(_ on: Bool) -> Bool {
         let scriptSource = "do shell script \"/usr/bin/pmset -a disablesleep \(on ? 1 : 0)\" with administrator privileges"
         var error: NSDictionary?
         if let script = NSAppleScript(source: scriptSource) {
@@ -140,6 +140,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         return false
     }
+
+    @discardableResult
+    func setSleepDisabled(_ on: Bool) -> Bool {
+        // Try passwordless sudo first
+        let result = trySudoSetSleep(on)
+        if result {
+            isSleepDisabled = on
+            updateUI()
+            return true
+        }
+        // No sudo; automatic actions give up (no prompt)
+        return false
+    }
+
+    // Helper for sudo invocation (synchronous, no UI block)
+    private func trySudoSetSleep(_ on: Bool) -> Bool {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+        proc.arguments = ["-n", "/usr/bin/pmset", "-a", "disablesleep", on ? "1" : "0"]
+        do {
+            try proc.run()
+            proc.waitUntilExit()
+            return proc.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
+
 
     func activate(duration: TimeInterval?) {
         sleepTimer?.invalidate()
