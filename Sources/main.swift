@@ -1,4 +1,6 @@
 import AppKit
+import Foundation
+import IOKit.ps
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -7,12 +9,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var matikanMenuItem: NSMenuItem!
     var isSleepDisabled: Bool = false
     var sleepTimer: Timer?
+    var batteryTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         buildMenu()
+
+        // Read current state via pmset -g read
+        isSleepDisabled = readSleepDisabledState()
         updateUI()
+
+        // Battery check every 60s using IOKit.ps
+        let timer = Timer(timeInterval: 60.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.checkBatterySafety()
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        batteryTimer = timer
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if isSleepDisabled {
+            setSleepDisabled(false)
+        }
     }
 
     func buildMenu() {
@@ -52,6 +73,57 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusMenuItem.title = isSleepDisabled ? "Status: On" : "Status: Off"
         matikanMenuItem.isHidden = !isSleepDisabled
+    }
+
+    func readSleepDisabledState() -> Bool {
+        // pmset -g read
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
+        process.arguments = ["-g"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            if let output = String(data: data, encoding: .utf8) {
+                for line in output.components(separatedBy: .newlines) {
+                    let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmed.localizedCaseInsensitiveContains("SleepDisabled") {
+                        if trimmed.hasSuffix("1") || trimmed.contains(" 1") {
+                            return true
+                        }
+                    }
+                }
+            }
+        } catch {
+            return false
+        }
+        return false
+    }
+
+    func checkBatterySafety() {
+        guard isSleepDisabled else { return }
+        guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+              let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef] else {
+            return
+        }
+        for ps in list {
+            if let desc = IOPSGetPowerSourceDescription(info, ps)?.takeUnretainedValue() as? [String: Any] {
+                let state = desc[kIOPSPowerSourceStateKey] as? String
+                let isAC = (state == kIOPSACPowerValue)
+                if !isAC,
+                   let current = desc[kIOPSCurrentCapacityKey] as? Int,
+                   let max = desc[kIOPSMaxCapacityKey] as? Int,
+                   max > 0 {
+                    let percent = Double(current) / Double(max) * 100.0
+                    if percent <= 20.0 {
+                        turnOff()
+                        break
+                    }
+                }
+            }
+        }
     }
 
     @discardableResult
