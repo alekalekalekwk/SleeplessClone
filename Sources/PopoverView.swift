@@ -27,7 +27,7 @@ struct PopoverView: View {
             
             if settings.mode == 0 {
                 // Duration chips
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     ForEach(durationOptions, id: \ .0) { opt in
                         Button(action: {
                             withAnimation(.easeOut(duration: 0.15)) {
@@ -35,15 +35,19 @@ struct PopoverView: View {
                             }
                         }) {
                             Text(opt.0)
-                                .font(.system(size: 13))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(settings.durationMinutes == opt.1 ? Color.accentColor : Color.secondary.opacity(0.1))
-                            .foregroundColor(settings.durationMinutes == opt.1 ? .white : .primary)
-                            .cornerRadius(8)
+                                .font(.system(size: 13, weight: .medium))
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, minHeight: 28)
                         }
+                        .buttonStyle(.plain)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(settings.durationMinutes == opt.1 ? Color.accentColor : Color.primary.opacity(0.08))
+                        )
+                        .foregroundColor(settings.durationMinutes == opt.1 ? .white : .primary)
                     }
                 }
+
             } else {
                 // Battery slider
                 VStack(alignment: .leading, spacing: 4) {
@@ -72,17 +76,27 @@ struct PopoverView: View {
             if controller.isSleepDisabled {
                 VStack(spacing: 2) {
                     if let end = controller.endDate {
-                        Text(end, style: .timer)
-                            .monospacedDigit()
+                        if settings.mode == 0 {
+                            Text(end, style: .timer)
+                                .monospacedDigit()
+                        } else {
+                            Text("Until battery hits \(settings.stopAtBatteryPercent)%")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     } else {
-                        Text("Until you stop")
-                            .font(.subheadline)
+                        if settings.mode == 0 {
+                            Text("Until you stop")
+                                .font(.subheadline)
+                        } else {
+                            Text("Until battery hits \(settings.stopAtBatteryPercent)%")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
-                    Text("Stops at \(settings.stopAtBatteryPercent)% battery")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
                 }
             }
+
             
             Divider()
             
