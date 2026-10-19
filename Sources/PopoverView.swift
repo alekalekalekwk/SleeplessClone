@@ -4,7 +4,7 @@ import Carbon.HIToolbox
 struct PopoverView: View {
     @ObservedObject var settings = Settings.shared
     @ObservedObject var controller = SleepController.shared
-    @ObservedObject var popoverState = PopoverState()
+    @ObservedObject var popoverState = PopoverState.shared
     
     // Duration options: label and minutes (nil = infinite)
     private let durationOptions: [(String, Int?)] = [
@@ -107,6 +107,14 @@ struct PopoverView: View {
                     .font(.caption)
                     .foregroundColor(.red)
             }
+            
+            Button("Quit") {
+                SleepController.shared.quit()
+            }
+            .buttonStyle(.plain)
+            .font(.caption)
+            .foregroundColor(.secondary)
+            .padding(.top, 4)
         }
         .padding(16)
         .frame(width: 260)

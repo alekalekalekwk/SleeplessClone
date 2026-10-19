@@ -183,6 +183,7 @@ final class SleepController: ObservableObject {
         let success = setSleepDisabled(false)
         if success {
             automaticTurnOffRetryScheduled = false
+            HUDManager.shared.show(title: "Sleepless off")
         } else {
             isSleepDisabled = true
             onStateChange?()
@@ -192,7 +193,10 @@ final class SleepController: ObservableObject {
                     Task { @MainActor in
                         guard let self = self else { return }
                         let retrySuccess = self.setSleepDisabled(false)
-                        if !retrySuccess {
+                        if retrySuccess {
+                            self.automaticTurnOffRetryScheduled = false
+                            HUDManager.shared.show(title: "Sleepless off")
+                        } else {
                             self.isSleepDisabled = true
                             self.onStateChange?()
                             if !self.automaticTurnOffAlertShown {
