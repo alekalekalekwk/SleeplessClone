@@ -72,11 +72,8 @@ struct PopoverView: View {
             if controller.isSleepDisabled {
                 VStack(spacing: 2) {
                     if let end = controller.endDate {
-                        TimelineView(.periodic(from: .now, by: 1.0)) { (ctx: TimelineView<Date>.Context) in
-                            let remaining = max(0, end.timeIntervalSince(ctx.date))
-                            Text(formatRemaining(remaining))
-                                .font(.system(.monospacedDigit(), design: .default))
-                        }
+                        Text(end, style: .timer)
+                            .font(.system(.monospacedDigit(), design: .default))
                     } else {
                         Text("Until you stop")
                             .font(.subheadline)
