@@ -4,9 +4,7 @@ import Carbon.HIToolbox
 struct PopoverView: View {
     @ObservedObject var settings = Settings.shared
     @ObservedObject var controller = SleepController.shared
-    
-    @State private var isRecording = false
-    @State private var hotkeyError: String? = nil
+    @ObservedObject var popoverState = PopoverState()
     
     // Duration options: label and minutes (nil = infinite)
     private let durationOptions: [(String, Int?)] = [
@@ -41,7 +39,7 @@ struct PopoverView: View {
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
                                 .background(settings.durationMinutes == opt.1 ? Color.accentColor : Color.secondary.opacity(0.1))
-                                .foregroundColor(settings.durationMinutes == opt.1 ? .white : .primary)
+                                .foregroundColor(settings.durationMinutes == opt.1 ? .white : .primary))
                                 .cornerRadius(8)
                         }
                     }
@@ -95,19 +93,19 @@ struct PopoverView: View {
             HStack {
                 Text("Shortcut")
                 Spacer()
-                if isRecording {
+                if popoverState.isRecording {
                     Text("Press keys…")
                 } else {
                     Text(settings.hotkeyDisplayString)
                 }
-                Button(action: { isRecording = true }) {
+                Button(action: { popoverState.isRecording = true }) {
                     Image(systemName: "pencil")
                 }
                 .buttonStyle(.plain)
             }
             .padding(.vertical, 4)
             
-            if let err = hotkeyError {
+            if let err = popoverState.hotkeyError {
                 Text(err)
                     .font(.caption)
                     .foregroundColor(.red)
@@ -118,17 +116,16 @@ struct PopoverView: View {
         .background(Color(NSColor.windowBackgroundColor))
         .cornerRadius(8)
         .overlay(
-            KeyRecorder(isRecording: $isRecording) { keyCode, modifiers in
-                // Attempt registration
+            KeyRecorder(isRecording: $popoverState.isRecording) { keyCode, modifiers in
                 let ok = HotKeyManager.shared.register(keyCode: keyCode, carbonModifiers: modifiers)
                 if ok {
                     settings.hotkeyKeyCode = keyCode
                     settings.hotkeyModifiers = modifiers
-                    hotkeyError = nil
+                    popoverState.hotkeyError = nil
                 } else {
-                    hotkeyError = "Shortcut already in use"
+                    popoverState.hotkeyError = "Shortcut already in use"
                 }
-                isRecording = false
+                popoverState.isRecording = false
             }
         )
     }
