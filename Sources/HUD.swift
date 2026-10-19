@@ -9,15 +9,15 @@ final class HUDManager {
 
     private init() {}
 
-    func show(active: Bool, duration: String? = nil) {
+    func show(title: String, subtitle: String? = nil) {
         panel?.close()
         timer?.invalidate()
 
-        let hudView = HUDView(active: active, duration: duration)
+        let hudView = HUDContentView(title: title, subtitle: subtitle)
         let hostingView = NSHostingView(rootView: hudView)
 
         let newPanel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 240, height: 130),
+            contentRect: NSRect(x: 0, y: 0, width: 240, height: 120),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -33,19 +33,18 @@ final class HUDManager {
         effectView.material = .hudWindow
         effectView.state = .active
         effectView.blendingMode = .behindWindow
-        effectView.maskImage = maskImage(size: NSSize(width: 240, height: 130), cornerRadius: 20)
-        effectView.frame = NSRect(x: 0, y: 0, width: 240, height: 130)
+        effectView.maskImage = maskImage(size: NSSize(width: 240, height: 120), cornerRadius: 22)
+        effectView.frame = NSRect(x: 0, y: 0, width: 240, height: 120)
 
         hostingView.frame = effectView.bounds
         effectView.addSubview(hostingView)
         newPanel.contentView = effectView
 
-        // Center on screen with mouse
         let mouseLocation = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) } ?? NSScreen.main
         if let screen = screen {
             let x = screen.frame.origin.x + (screen.frame.width - 240) / 2
-            let y = screen.frame.origin.y + (screen.frame.height - 130) / 2
+            let y = screen.frame.origin.y + (screen.frame.height - 120) / 2
             newPanel.setFrameOrigin(NSPoint(x: x, y: y))
         }
 
@@ -63,7 +62,7 @@ final class HUDManager {
         }
 
         self.panel = newPanel
-        self.timer = Timer.scheduledTimer(withTimeInterval: 1.6, repeats: false) { [weak self] _ in
+        self.timer = Timer.scheduledTimer(withTimeInterval: 1.4, repeats: false) { [weak self] _ in
             Task { @MainActor in
                 self?.fadeOut()
             }
@@ -71,18 +70,22 @@ final class HUDManager {
     }
 
     private func fadeOut() {
-        guard let panel = panel else { return }
+        guard let p = panel else { return }
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         if reduceMotion {
-            panel.close()
+            p.close()
             self.panel = nil
         } else {
             NSAnimationContext.runAnimationGroup({ context in
-                context.duration = 0.25
-                panel.animator().alphaValue = 0
+                context.duration = 0.3
+                p.animator().alphaValue = 0
             }, completionHandler: {
-                panel.close()
-                if self.panel === panel { self.panel = nil }
+                Task { @MainActor in
+                    p.close()
+                    if self.panel === p {
+                        self.panel = nil
+                    }
+                }
             })
         }
     }
@@ -98,32 +101,26 @@ final class HUDManager {
     }
 }
 
-struct HUDView: View {
-    let active: Bool
-    let duration: String?
+struct HUDContentView: View {
+    let title: String
+    let subtitle: String?
 
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "moon.zzz.fill")
-                .font(.system(size: 40))
+        VStack(spacing: 6) {
+            Image(systemName: "moon.zzz")
+                .font(.system(size: 32))
                 .foregroundColor(.secondary)
             
-            if active {
-                VStack(spacing: 2) {
-                    Text("Sleepless activated for:")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    Text(duration ?? "Until you stop")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                }
-            } else {
-                Text("Sleepless off")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+            Text(title)
+                .font(.system(size: 15, weight: .semibold))
+            
+            if let subtitle = subtitle {
+                Text(subtitle)
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
             }
         }
-        .padding(16)
-        .frame(width: 240, height: 130)
+        .padding(12)
+        .frame(width: 240, height: 120)
     }
 }
