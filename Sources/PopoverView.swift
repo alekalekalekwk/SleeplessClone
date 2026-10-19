@@ -73,7 +73,7 @@ struct PopoverView: View {
                 VStack(spacing: 2) {
                     if let end = controller.endDate {
                         Text(end, style: .timer)
-                            .font(.system(.monospacedDigit(), design: .default))
+                            .monospacedDigit()
                     } else {
                         Text("Until you stop")
                             .font(.subheadline)
