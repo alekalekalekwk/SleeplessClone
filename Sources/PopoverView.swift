@@ -39,8 +39,8 @@ struct PopoverView: View {
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
                                 .background(settings.durationMinutes == opt.1 ? Color.accentColor : Color.secondary.opacity(0.1))
-                                .foregroundColor(settings.durationMinutes == opt.1 ? .white : .primary))
-                                .cornerRadius(8)
+                            .foregroundColor(settings.durationMinutes == opt.1 ? .white : .primary)
+                            .cornerRadius(8)
                         }
                     }
                 }
