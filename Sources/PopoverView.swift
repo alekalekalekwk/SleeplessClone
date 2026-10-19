@@ -72,7 +72,7 @@ struct PopoverView: View {
             if controller.isSleepDisabled {
                 VStack(spacing: 2) {
                     if let end = controller.endDate {
-                        TimelineView(.periodic(from: .now, by: 1.0)) { ctx in
+                        TimelineView(.periodic(from: .now, by: 1.0)) { (ctx: TimelineView<Date>.Context) in
                             let remaining = max(0, end.timeIntervalSince(ctx.date))
                             Text(formatRemaining(remaining))
                                 .font(.system(.monospacedDigit(), design: .default))
