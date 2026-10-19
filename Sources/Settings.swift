@@ -7,6 +7,7 @@ final class Settings: ObservableObject {
     static let shared = Settings()
 
     private enum Keys {
+        static let mode = "mode"
         static let durationMinutes = "durationMinutes"
         static let stopAtBatteryPercent = "stopAtBatteryPercent"
         static let hotkeyKeyCode = "hotkeyKeyCode"
@@ -15,35 +16,29 @@ final class Settings: ObservableObject {
 
     private let defaults = UserDefaults.standard
 
+    @Published var mode: Int {
+        didSet { defaults.set(mode, forKey: Keys.mode) }
+    }
+
     @Published var durationMinutes: Int? {
-        didSet {
-            if let duration = durationMinutes {
-                defaults.set(duration, forKey: Keys.durationMinutes)
-            } else {
-                defaults.set(-1, forKey: Keys.durationMinutes)
-            }
-        }
+        didSet { defaults.set(durationMinutes ?? -1, forKey: Keys.durationMinutes) }
     }
 
     @Published var stopAtBatteryPercent: Int {
-        didSet {
-            defaults.set(stopAtBatteryPercent, forKey: Keys.stopAtBatteryPercent)
-        }
+        didSet { defaults.set(stopAtBatteryPercent, forKey: Keys.stopAtBatteryPercent) }
     }
 
     @Published var hotkeyKeyCode: UInt32 {
-        didSet {
-            defaults.set(Int(hotkeyKeyCode), forKey: Keys.hotkeyKeyCode)
-        }
+        didSet { defaults.set(Int(hotkeyKeyCode), forKey: Keys.hotkeyKeyCode) }
     }
 
     @Published var hotkeyModifiers: UInt32 {
-        didSet {
-            defaults.set(Int(hotkeyModifiers), forKey: Keys.hotkeyModifiers)
-        }
+        didSet { defaults.set(Int(hotkeyModifiers), forKey: Keys.hotkeyModifiers) }
     }
 
     private init() {
+        self.mode = defaults.object(forKey: Keys.mode) == nil ? 0 : defaults.integer(forKey: Keys.mode)
+        
         if defaults.object(forKey: Keys.durationMinutes) == nil {
             self.durationMinutes = 120
         } else {
@@ -51,24 +46,10 @@ final class Settings: ObservableObject {
             self.durationMinutes = (val < 0) ? nil : val
         }
 
-        if defaults.object(forKey: Keys.stopAtBatteryPercent) == nil {
-            self.stopAtBatteryPercent = 20
-        } else {
-            let val = defaults.integer(forKey: Keys.stopAtBatteryPercent)
-            self.stopAtBatteryPercent = (val >= 10 && val <= 80) ? val : 20
-        }
-
-        if defaults.object(forKey: Keys.hotkeyKeyCode) == nil {
-            self.hotkeyKeyCode = UInt32(kVK_ANSI_P)
-        } else {
-            self.hotkeyKeyCode = UInt32(defaults.integer(forKey: Keys.hotkeyKeyCode))
-        }
-
-        if defaults.object(forKey: Keys.hotkeyModifiers) == nil {
-            self.hotkeyModifiers = UInt32(controlKey | optionKey | cmdKey)
-        } else {
-            self.hotkeyModifiers = UInt32(defaults.integer(forKey: Keys.hotkeyModifiers))
-        }
+        self.stopAtBatteryPercent = defaults.object(forKey: Keys.stopAtBatteryPercent) == nil ? 20 : defaults.integer(forKey: Keys.stopAtBatteryPercent)
+        
+        self.hotkeyKeyCode = defaults.object(forKey: Keys.hotkeyKeyCode) == nil ? UInt32(kVK_ANSI_P) : UInt32(defaults.integer(forKey: Keys.hotkeyKeyCode))
+        self.hotkeyModifiers = defaults.object(forKey: Keys.hotkeyModifiers) == nil ? UInt32(shiftKey | cmdKey) : UInt32(defaults.integer(forKey: Keys.hotkeyModifiers))
     }
 
     var hotkeyDisplayString: String {
